@@ -3,7 +3,7 @@ from scipy.integrate import solve_ivp
 from GlucoseDynamicsSimulator import GlucoseDynamicsSimulator
 
 
-class DigitalTwinSAC:
+class DigitalTwinModel:
     """Deterministic digital twin of CustomGlucoseDynamicsEnvBox for planning."""
 
     def __init__(self, weight=70.0, Gb=90.0, Ib=15.0, dt=5):
@@ -29,11 +29,20 @@ class DigitalTwinSAC:
 
     @staticmethod
     def _map_meal_category_to_glucose_rate(category):
-        return [0.0, 0.45, 0.65, 0.8][category]
+        return [0.0, 0.45, 0.65, 0.8][int(category)]
 
     @staticmethod
     def _map_exercise_level_to_intensity(level):
-        return [0.0, 0.3, 0.6, 0.9][level]
+        return [0.0, 0.3, 0.6, 0.9][int(level)]
+
+    @staticmethod
+    def _validate_discrete_action(a):
+        a = np.asarray(a, dtype=np.int32).copy()
+        a[0] = np.clip(a[0], 0, 3)
+        a[1] = np.clip(a[1], 0, 1)
+        a[2] = np.clip(a[2], 0, 3)
+        a[3] = np.clip(a[3], 0, 12)
+        return a
 
     def _build_observation_from_latent(self):
         G = float(self.latent_state[0])
@@ -42,10 +51,12 @@ class DigitalTwinSAC:
         time_since_last_exercise = float(self.latent_state[6])
         L = float(self.latent_state[4])
         t = float(self.time_since_midnight)
+
         prev_glucose = float(
             G if self.previous_glucose_level is None else self.previous_glucose_level
         )
-        obs = np.array(
+
+        return np.array(
             [
                 G,
                 prev_glucose,
@@ -60,22 +71,21 @@ class DigitalTwinSAC:
             ],
             dtype=np.float32,
         )
-        return obs
 
     def sync_from_env_state(self, env_state):
         self.latent_state = env_state["simulator_state"].copy()
-        self.time_since_midnight = env_state["time_since_midnight"]
-        self.previous_glucose_level = env_state["previous_glucose_level"]
+        self.time_since_midnight = float(env_state["time_since_midnight"])
+        self.previous_glucose_level = float(env_state["previous_glucose_level"])
         self.current_exercise_session = env_state["current_exercise_session"].copy()
 
     def simulate_step(self, action, env_state):
         self.sync_from_env_state(env_state)
-        return self._advance_one_step(action)
+        return self._advance_one_step_discrete(action)
 
-    def _advance_one_step(self, action):
-        meal_cat, exercise_mode, exercise_intensity, exercise_duration = (
-            self._continuous_to_discrete(action)
-        )
+    def _advance_one_step_discrete(self, action):
+        a = self._validate_discrete_action(action)
+        meal_cat, exercise_mode, exercise_intensity, exercise_duration = a.tolist()
+
         Rameal_current = self._map_meal_category_to_glucose_rate(meal_cat)
 
         if exercise_mode == 1 and not self.current_exercise_session["active"]:
@@ -101,9 +111,11 @@ class DigitalTwinSAC:
                 }
 
         E_current = float(self.current_exercise_session["intensity"])
+
         ode_func = lambda t, y: self.sim.odes(
             y, (Rameal_current, E_current, meal_cat > 0, exercise_mode == 1)
         )
+
         sol = solve_ivp(
             ode_func,
             t_span=(0, self.dt),
@@ -111,24 +123,32 @@ class DigitalTwinSAC:
             method="RK45",
             max_step=0.5,
         )
+
         self.latent_state = sol.y[:, -1]
         self.time_since_midnight += self.dt
         self.previous_glucose_level = float(self.latent_state[0])
+
         return self._build_observation_from_latent()
 
     def rollout_from_env_state(
         self, env_state, first_action, policy, horizon=5, deterministic=False
     ):
-        backup = self._snapshot()
+        snap = self._snapshot()
         self.sync_from_env_state(env_state)
-        traj_obs, actions = [], []
-        a = np.array(first_action, dtype=np.float32)
-        for _ in range(horizon):
-            next_obs = self._advance_one_step(a)
+
+        traj_obs = []
+        actions = []
+
+        a = self._validate_discrete_action(first_action)
+        for _ in range(int(horizon)):
+            next_obs = self._advance_one_step_discrete(a)
             traj_obs.append(next_obs.copy())
+
             a, _ = policy.predict(next_obs, deterministic=deterministic)
+            a = self._validate_discrete_action(a)
             actions.append(a.copy())
-        self._restore(backup)
+
+        self._restore(snap)
         return np.array(traj_obs), np.array(actions)
 
     def _snapshot(self):

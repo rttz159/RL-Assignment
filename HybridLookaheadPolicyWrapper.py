@@ -1,5 +1,5 @@
 import numpy as np
-from DigitalTwinSAC import DigitalTwinSAC
+from DigitalTwinModel import DigitalTwinModel
 
 
 class HybridLookaheadPolicyWrapper:
@@ -13,7 +13,7 @@ class HybridLookaheadPolicyWrapper:
     def __init__(
         self,
         sac_model,
-        digital_twin: DigitalTwinSAC,
+        digital_twin: DigitalTwinModel,
         horizon=5,
         candidates=5,
         target_glucose=100.0,

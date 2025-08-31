@@ -6,10 +6,10 @@ import matplotlib.lines as mlines
 import seaborn as sns
 import pandas as pd
 import time
-from CustomGlucoseDynamicsEnvBox import CustomGlucoseDynamicsEnvBox
-from DigitalTwinSAC import DigitalTwinSAC
+from CustomGlucoseDynamicsEnv import CustomGlucoseDynamicsEnv
+from DigitalTwinModel import DigitalTwinModel
 from HybridLookaheadPolicyWrapper import HybridLookaheadPolicyWrapper
-from stable_baselines3 import SAC
+from stable_baselines3 import PPO
 
 st.markdown(
     """
@@ -127,11 +127,11 @@ meal_schedule = {
 if simulate_button:
     st.info("Running real-time simulation...")
 
-    env = CustomGlucoseDynamicsEnvBox(random_events=False, weight=weight, Gb=Gb, Ib=Ib)
+    env = CustomGlucoseDynamicsEnv(random_events=False, weight=weight, Gb=Gb, Ib=Ib)
     obs, _ = env.reset()
 
-    model = SAC.load("sac_glucose_model.zip")
-    twin = DigitalTwinSAC(weight=weight, Gb=Gb, Ib=Ib, dt=STEP_MINUTES)
+    model = PPO.load("ppo_best_glucose_model.zip")
+    twin = DigitalTwinModel(weight=weight, Gb=Gb, Ib=Ib, dt=STEP_MINUTES)
     planner = HybridLookaheadPolicyWrapper(
         sac_model=model,
         digital_twin=twin,
