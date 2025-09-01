@@ -4,7 +4,7 @@ from GlucoseDynamicsSimulator import GlucoseDynamicsSimulator
 
 
 class DigitalTwinModel:
-    """Deterministic digital twin of CustomGlucoseDynamicsEnvBox for planning."""
+    """Deterministic digital twin of CustomGlucoseDynamicsEnv for planning."""
 
     def __init__(self, weight=70.0, Gb=90.0, Ib=15.0, dt=5):
         self.sim = GlucoseDynamicsSimulator(weight=weight, Gb=Gb, Ib=Ib)

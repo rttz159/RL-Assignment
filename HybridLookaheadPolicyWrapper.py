@@ -3,7 +3,7 @@ from DigitalTwinModel import DigitalTwinModel
 
 
 class HybridLookaheadPolicyWrapper:
-    """Lookahead planner with SAC and hybrid emergency override for glucose extremes."""
+    """Lookahead planner with RL Model and hybrid emergency override for glucose extremes."""
 
     SAFE_LOW = 70.0
     SAFE_HIGH = 180.0
@@ -12,13 +12,13 @@ class HybridLookaheadPolicyWrapper:
 
     def __init__(
         self,
-        sac_model,
+        model,
         digital_twin: DigitalTwinModel,
         horizon=5,
         candidates=5,
         target_glucose=100.0,
     ):
-        self.model = sac_model
+        self.model = model
         self.twin = digital_twin
         self.horizon = int(horizon)
         self.candidates = int(candidates)
@@ -72,4 +72,4 @@ class HybridLookaheadPolicyWrapper:
                 best_score = score
                 best_action = first_action
 
-        return best_action, "SAC lookahead"
+        return best_action, "RL Model lookahead"

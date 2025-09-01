@@ -133,7 +133,7 @@ if simulate_button:
     model = PPO.load("ppo_best_glucose_model.zip")
     twin = DigitalTwinModel(weight=weight, Gb=Gb, Ib=Ib, dt=STEP_MINUTES)
     planner = HybridLookaheadPolicyWrapper(
-        sac_model=model,
+        model=model,
         digital_twin=twin,
         horizon=6,
         candidates=5,
